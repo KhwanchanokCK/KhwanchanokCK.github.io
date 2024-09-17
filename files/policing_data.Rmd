@@ -1,0 +1,242 @@
+---
+title: "MA304 Coursework: Analysis of a policing dataset from Dallas, Texas in 2016"
+author: "Khwanchanok Chumkhun : 2110866"
+date: "4/27/2022"
+output: 
+    html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,error=FALSE, warning=FALSE, message=FALSE,layout="l-body-outset") 
+#load required libraries
+library(knitr)
+library(dsEssex)
+library(tidyverse)
+library(tidytext)
+library(ggplot2)
+library(plotrix)
+library(ggrepel)
+library(dplyr)
+library(leaflet)
+library(tidyr)
+library(plotly)
+library(ggcorrplot)
+library(Hmisc)
+library(scales)
+
+#=========================
+#download data to R session
+ori.data <- read.csv("37-00049_UOF-P_2016_prepped.csv")
+# str(ori.data)
+# colSums(is.na(ori.data))
+```
+
+### Introduction
+<p style="font-family: times new roman, serif; font-size:12pt">
+The dataset used in this report is part of data from a Kaggle competition project ‘Data Science for Good: Center for Policing Equity’. 
+The goal of this project is to bridge the gap resulting from communication problems, suffering and generational mistrust, and to construct the way to public safety, community trust, and equity in the race. (Data Science for Good: Center for Policing Equity, 2022)  
+The main objective of this study is to analyze and visualize the policing dataset from Dallas, Texas in 2016 in order to clarify whether the inequity in policing exists or not. The report consists of 3 main parts:  
+I) Data preparation  
+In this topic, to minimize the complexity of the study, only some variables will be selected to be analyzed and missing value will be cleaned.  
+II) Data analysis and visualization  
+- Univariate analysis will be used to analyze the insight meaning of variables and to find out whether some variables can display the inequity in policing or not.  
+- Then the relation between variables will be studied to clarify the factors which may correspond to the inequity in case it exists.  
+III) Conclusion   
+Finally, the overall finding result of the study will be briefly discussed and concluded in this section.  
+
+All analysis and statistical studies in this report will be conducted using the R language with RMarkdown. The report is in HTML format generated using RMarkdown.
+
+
+### I) Data preparation
+The original dataset contains 47 variables which will not be all used in this study, 35 variables are removed in this section. After that missing values of the remaining 12 variables are cleaned. 
+Then data structure is confirmed and the data type of some variables are convert to what it should be.  
+</p>
+
+```{r}
+#remove first row (duplicate with column name)
+data <- ori.data[-1,]
+data <- data[,c(1,5:6,8:9,13:15,32:35)]
+data <- na_if(data,"NULL")
+data <- na_if(data,"")
+data <- na_if(data,"Unknown")
+# str(data)
+# colSums(is.na(data))
+p.data <- data
+p.data <- p.data[complete.cases(p.data$SUBJECT_RACE),]
+p.data <- p.data[complete.cases(p.data$SUBJECT_GENDER),]
+p.data <- p.data[complete.cases(p.data$LOCATION_LATITUDE),]
+p.data <- p.data[complete.cases(p.data$REASON_FOR_FORCE),]
+
+p.data$INCIDENT_DATE <- as.Date(p.data$INCIDENT_DATE,tryFormats ="%m/%d/%y",optional = FALSE)
+p.data$OFFICER_YEARS_ON_FORCE <- as.numeric(p.data$OFFICER_YEARS_ON_FORCE)
+#colSums(is.na(p.data))
+# describe(p.data)
+# str(p.data)
+```
+### II) Data analysis and visualization
+<p style="font-family: times new roman, serif; font-size:12pt">
+Before starting the analysis, the incident information is displayed to understand the overall situation.  
+
+</p>
+#### Figure1: Overall incident information
+```{r}
+p.data$lat <- as.numeric(p.data$LOCATION_LATITUDE)
+p.data$lng <- as.numeric(p.data$LOCATION_LONGITUDE)
+p.data %>%
+  leaflet() %>%
+  addTiles() %>%
+  setView(lat = 32.779167, lng = -96.808891,zoom = 10) %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Accidental Discharge",], group = "Accidental Discharge", color = "#d73027") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Call for Cover",], group = "Call for Cover", color= "#c74c8b") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Arrest",], group = "Arrest", color= "#f46d43") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Crime in Progress",], group = "Crime in Progress", color= "#fdae61") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Crowd Control",], group = "Crowd Control", color= "#fee090") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Off-Duty Employment",], group = "Off-Duty Employment", color= "#ffffbf") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Off-Duty Incident",], group = "Off-Duty Incident", color= "#e0f3f8") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Other ( In Narrative)",], group = "Other ( In Narrative)", color= "#abd9e9") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Pedestrian Stop",], group = "Pedestrian Stop", color= "#74add1") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Service Call",], group = "Service Call", color= "#1a9850") %>%
+    addCircles(data = p.data[p.data$INCIDENT_REASON=="Traffic Stop",], group = "Traffic Stop", color= "#66bd63") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Warrant Execution",], group = "Warrant Execution", color= "#1c9850") %>%
+  addCircles(data = p.data[p.data$INCIDENT_REASON=="Suspicious Activity",], group = "Suspicious Activity", color= "#006837")  %>%
+  addLegend("bottomright", colors = c("#d73027","#c74c8b","#f46d43","#fdae61","#fee090","#ffffbf","#e0f3f8","#abd9e9","#74add1","#1a9850","#66bd63","#1c9850","#006837"), labels = c("Accidental Discharge","Call for Cover","Arrest","Crime in Progress","Crowd Control","Off-Duty Employment","Off-Duty Incident","Other ( In Narrative)","Pedestrian Stop","Service Call","Traffic Stop","Warrant Execution","Suspicious Activity"),title = "Incident reason")
+
+```
+<p style="font-family: times new roman, serif; font-size:12pt">
+Figure1 shows that the incidents distribute all over Dallas. This map can be used to understand the location where the force most frequent occurred and the reason of incident. In this case, we can see that the incident occurred most in the centre area.
+<br/>
+Next, we will illustrate the timeline of the incidents to explore whether there is significant meaning in relation to time or not.  
+
+</p>
+```{r}
+dat.t<- p.data  %>% count(INCIDENT_DATE)
+names(dat.t)[2] <- paste("Number_of_Incident") 
+gbase <- ggplot(dat.t,aes(x=INCIDENT_DATE,y=Number_of_Incident))
+g1 <- gbase+geom_line(size=0.5)+ xlab("Date")+ylab("Number of Incident") + ggtitle("Figure2: Incident time line")
+ggplotly(g1)
+```
+<p style="font-family: times new roman, serif; font-size:12pt">
+From figure2, we can see that the average of cases that occurred at the beginning of the year is a bit higher than at the middle of the year. But this does not significantly explain the relationship between the timeline and the number of incidents.
+
+Then now we start the first analysis, univariate analysis is implemented to investigate the data related to the subject (subject race, subject gender) to explore if there is significant inequality in policing between each race and each gender of the subject or not.
+</p>
+```{r}
+sub.race  <- p.data %>% count(SUBJECT_RACE)
+plot1 <- ggplot(sub.race,aes(reorder(SUBJECT_RACE,n,sum),n))+
+  geom_col(fill="#756bb1") +
+  labs(x = "Subject's race",
+       y = "Number of force",
+       title = ("Figure3: SUBJECT by RACE")) +
+  coord_flip() +
+  theme_minimal()
+ggplotly(plot1)
+```
+
+<p style="font-family: times new roman, serif; font-size:12pt">
+Figure3 clearly shows that the force is most used on Blacks (1294 cases), the frequency is more than 2 times of the second rank victim of the use of force which is Hispanics (511 cases), while the Whites are in the third rank with 460 cases (almost 3 times less than Blacks).
+<br/>
+This absolute number of cases might not be certainly able to explain the inequity in policing, it might be required the total number of the population of each race and find the ratio between the use of force cases and the total population. But in this study, the total number of citizens is not provided, so we assume that these absolutes justify the racial disparity.
+<br/>
+<br/>
+Next, we study the subject gender to clarify whether there is an inequality between gender or not.
+</p>
+```{r}
+t1 <- table(p.data$SUBJECT_GENDER)
+pie(t1,main = "Figure4: SUBJECT by GENDER")
+
+```
+<p style="font-family: times new roman, serif; font-size:12pt">
+The pie chart illustrates that the force was used on males more than on females almost 4.5 times. This also explains that there might be a gender disparity.  
+
+Next, we focus on the officer's information, to confirm if there is any aspect displayed to the inequality.  
+</p>
+```{r}
+or <- table(p.data$OFFICER_RACE)
+pie(or,main = "Figure5: OFFICER'S RACE")
+```
+<p style="font-family: times new roman, serif; font-size:12pt">
+Figure5 demonstates that the biggest ratio of the officers who applied the force on the subject is white police followed by Hispanics and Blacks respectively. This might be able to explain the disparity of race or maybe just because the Whites work as police more than other races, we need more data to investigate in detail and to conclude this.
+```{r}
+yof <- ggplot(p.data,aes(x=OFFICER_YEARS_ON_FORCE)) + geom_bar() +
+  xlab("Officer year on force")  + ggtitle("Figure6: OFFICER YEAR ON FORCE")
+ggplotly(yof)
+
+```
+While figure6 shows that the officers with 1-10 years of experience are the most use of force.
+The biggest amount of the ratio is 2 years of experienced officers.
+
+Next, we use boxplots to understand more about officers' information.
+</p>
+```{r}
+g.bp <- ggplot(p.data,aes(x=as.factor(OFFICER_RACE),y=OFFICER_YEARS_ON_FORCE)) + geom_boxplot(aes(fill =  OFFICER_RACE))+ ggtitle("Figure7: Officer year on force by race and gender") + ylab("Officer year on force") + xlab("Subject's race")+  facet_grid(OFFICER_GENDER ~ .) 
+ggplotly(g.bp)
+```
+<p style="font-family: times new roman, serif; font-size:12pt">
+Comparing the year on the force of the white officers (biggest ratio) and the black officers, we found that the average working year of black polices are higher than whites and the distribution is also wider ( the range of working experience is wider). While males work longer than females on average.
+<br/>
+<br/>
+From the previous section, we assume that there is a racial and gender disparity in policing.  In this section, the bivariate analysis will be applied to study the relationship between variables to explain the following questions.  
+- Is the injury from force relates to the subject’s race?  
+- The officer’s race correlates to the subject's race?  
+- The subject’s injury has some relation to their race and gender?  
+- The officer’s level (OFFICER_YEARS_ON_FORCE) has an influent on the subject’s injury (by race)?    
+
+Injury by Subject'race : Now we investigate a bit more in detail how the force that occurred to each subject's race caused the injury to the subjects.
+</p>
+```{r}
+inj.t <- table(p.data$SUBJECT_INJURY,p.data$SUBJECT_RACE)
+barplot(inj.t, beside = TRUE,legend.text = c("No injury","Injury"),col = c("#ffd452","black"),main = "Figure8: Injury by Subject'race")
+```
+<p style="font-family: times new roman, serif; font-size:12pt">
+From the figure8, we can see that the number of injuries corresponds to the number of the force used. Since the force is most used on Blacks, the injuries also happened to Blacks which is normal.
+<br/>
+<br/>
+Subject's race by officer's race: here we will study whether the officer’s race influences the use of force on each subject’s race or not.
+</p>
+```{r}
+race.t <- table(p.data$OFFICER_RACE,p.data$SUBJECT_RACE)
+barplot(race.t,col = c("#1b4ca1","#ffd452","black","#44c7c0","#e675c6","#e68f75"),legend.text = row.names(race.t),xlab = "Subject's race",ylab = "No. of cases",main = "Figure9: Subject's race by officer's race")
+```
+<p style="font-family: times new roman, serif; font-size:12pt">
+The figure obviously shows that more than half of the force used on Blacks, Hispanics and Whites has arisen from the white police. It might be one of the signs of the racial disparity or it might just only because the ratio of the white police is bigger than other races.
+<br/>
+<br/>
+Subject injury by race and gender: in this section, we will conduct more investigation on the injury. For each subject's race and gender, we will study if there is a significant relation to the injury or not.
+</p>
+```{r}
+far <- ggplot(p.data, aes(SUBJECT_RACE)) +
+  geom_bar(aes(fill = SUBJECT_GENDER), alpha=0.5, position = "dodge") +
+  facet_grid(SUBJECT_INJURY ~ .) +
+  theme_bw() + xlab("Subject's race") +
+  scale_fill_discrete(name="Subject Gender",
+                      breaks=c("Female", "Male"),
+                      labels=c("Female", "Male")) +
+  ggtitle("Figure10: Subject injury by race and gender") +
+  theme(plot.title = element_text(size=14),
+        axis.text.x = element_text(size=7, vjust = 0.5, hjust=1))
+ggplotly(far)
+```
+<p style="font-family: times new roman, serif; font-size:12pt">
+The result from figure10 displays the same proportion of injury for each race of subjects and each gender. We can assume that the subject’s race and gender do not influence the number of injuries, only the number of cases relate to the number of injuries.
+<br/>
+<br/>
+Subject's race by officer's position (OFFICER_YEARS_ON_FORCE): lastly, we will confirm if the experience of officers correlates to the force used in each race of subjects or not.
+</p>
+
+```{r}
+
+oysr <- ggplot(p.data, aes(x=OFFICER_YEARS_ON_FORCE)) +
+  geom_bar(aes(fill = SUBJECT_RACE), alpha=0.5, position = "stack") +
+  facet_grid(SUBJECT_INJURY ~ .)+
+  ggtitle("Figure11: Subject injury by officer's year on force and subject's race")
+
+ggplotly(oysr)
+``````
+<p style="font-family: times new roman, serif; font-size:12pt">
+Related to other previous charts, the forces are used the most on Blacks and they are the biggest group to get an injury, most cases caused by the officers with 1-10 years of experience.
+</p>
+### III) Conclusion
+<p style="font-family: times new roman, serif; font-size:12pt">
+From the analysis of the policing dataset from Dallas, Texas in 2016, we can conclude that there are racial and gender disparities in policing. Most of the forces are used on Blacks, Hispanics and Whites respectively. The officer’s race is one of the suspect factors that relate to the racial bias. The working year of the officers also displays some correspondence to the disparity, this result can be used to include some training courses for each level of officers. This is just a preliminary investigation, to make the results more precise and reliable, more data are required.
+</p>
+
+
